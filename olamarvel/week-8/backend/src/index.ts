@@ -10,6 +10,7 @@ import authRoutes from "./Routes/auth";
 import doctorRoutes from "./Routes/doctor";
 import { errorHandler } from "./Middlewares/error";
 import logger from "./util/logger";
+import { requestTimingMiddleware, register, appUptimeGauge } from './util/metrics';
 
 
 const app = express();
@@ -18,6 +19,8 @@ const allowedOrigins = [
   "http://localhost:3001",
   "https://pluse-track-frontend.vercel.app",
 ];
+
+app.use(requestTimingMiddleware)
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -52,21 +55,23 @@ app.use("/health-check", (req, res) => {
   });
 })
 app.get('/metrics', async (req, res) => {
-  res.set('Content-Type', 'text/plain');
-  res.send(await (await import('./util/metrics')).register.metrics());
+  res.set('Content-Type', register.contentType);
+  res.send(await register.metrics());
 });
 
 app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-app.use(errorHandler);
+appUptimeGauge.set({ service: 'backend' }, process.uptime());
+
 
 app.use((req, res) => {
   logger.info('not found', { path: req.path });
   res.status(404).send({ error: 'Not found' });
 });
 
+app.use(errorHandler);
 
 
 const PORT = process.env.PORT || 5000;
